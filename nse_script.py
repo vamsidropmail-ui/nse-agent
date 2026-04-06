@@ -60,8 +60,8 @@ def send_email(table_html):
     ]
 
     message = MIMEMultipart()
-    message["Subject"] = f"NSE F&O Whole Numbers - {datetime.date.today()}"
-    message["From"] = sender_email
+    message["Subject"] = f"NSE F&O Whole Price Stocks - {datetime.date.today()}"
+    message["From"] = f"NSE Bot <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
     message.attach(MIMEText(table_html, "html"))
