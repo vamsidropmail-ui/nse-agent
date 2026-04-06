@@ -24,14 +24,17 @@ def run_nse_task():
     data = []
 
     for item in data_json["data"]:
+    try:
         symbol = item["metadata"]["symbol"]
-        final_val = item["metadata"]["lastPrice"]
+        final_val = item["detail"]["preOpenMarket"]["finalPrice"]
 
         if float(final_val).is_integer():
             data.append({
                 "symbol": symbol,
-                "final": int(final_val)
+                "final": int(float(final_val))
             })
+    except:
+        continue
 
     if data:
         df = pd.DataFrame(data)
