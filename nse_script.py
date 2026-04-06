@@ -42,8 +42,9 @@ def run_nse_task():
             continue
 
     if data:
-        df = pd.DataFrame(data)
-        send_email(df.to_html(index=False))
+    df = pd.DataFrame(data)
+    df = df.sort_values(by="symbol")   # 👈 sorting A → Z
+    send_email(df.to_html(index=False))
     else:
         print("No data found")
 
@@ -54,7 +55,8 @@ def send_email(table_html):
 
     recipients = [
         "amitnamo610@gmail.com",
-        "vamsidropmail@gmail.com"
+        "vamsidropmail@gmail.com",
+        "rmohan1969@gmail.com"
     ]
 
     message = MIMEMultipart()
