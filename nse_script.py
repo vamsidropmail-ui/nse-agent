@@ -10,13 +10,13 @@ def run_nse_task():
     data = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         )
         page = context.new_page()
 
-        page.goto("https://www.nseindia.com", timeout=60000)
+        page.goto("https://www.nseindia.com", timeout=60000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
         page.goto("https://www.nseindia.com/market-data/pre-open-market-cm-and-emerge-market", timeout=60000)
