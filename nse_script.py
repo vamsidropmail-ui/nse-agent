@@ -43,10 +43,10 @@ def run_nse_task():
 
     if data:
     df = pd.DataFrame(data)
-    df = df.sort_values(by="symbol")   # 👈 sorting A → Z
+    df = df.sort_values(by="symbol")
     send_email(df.to_html(index=False))
-    else:
-        print("No data found")
+else:
+    print("No data found")
 
 
 def send_email(table_html):
@@ -61,7 +61,7 @@ def send_email(table_html):
 
     message = MIMEMultipart()
     message["Subject"] = f"NSE F&O Whole Price Stocks - {datetime.date.today()}"
-    message["From"] = f"NSE Bot <{sender_email}>"
+    message["From"] = f"NSE Alerts <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
     message.attach(MIMEText(table_html, "html"))
