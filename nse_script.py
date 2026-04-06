@@ -18,27 +18,34 @@ def run_nse_task():
     session = requests.Session()
     session.get("https://www.nseindia.com", headers=headers)
 
-    response = session.get(url, headers=headers)
+    response = session.get(url, headers=headers, timeout=10)
+
+    if response.status_code != 200:
+        print("API failed:", response.status_code)
+        return
+
     data_json = response.json()
 
     data = []
 
     for item in data_json["data"]:
-    try:
-        symbol = item["metadata"]["symbol"]
-        final_val = item["detail"]["preOpenMarket"]["finalPrice"]
+        try:
+            symbol = item["metadata"]["symbol"]
+            final_val = item["detail"]["preOpenMarket"]["finalPrice"]
 
-        if float(final_val).is_integer():
-            data.append({
-                "symbol": symbol,
-                "final": int(float(final_val))
-            })
-    except:
-        continue
+            if float(final_val).is_integer():
+                data.append({
+                    "symbol": symbol,
+                    "final": int(float(final_val))
+                })
+        except:
+            continue
 
     if data:
         df = pd.DataFrame(data)
         send_email(df.to_html(index=False))
+    else:
+        print("No data found")
 
 
 def send_email(table_html):
