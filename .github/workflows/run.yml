@@ -21,8 +21,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install pandas playwright
-        playwright install --with-deps
+        pip install pandas requests
 
     - name: Run script
       env:
