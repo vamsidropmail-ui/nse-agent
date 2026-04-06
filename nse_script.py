@@ -61,7 +61,8 @@ def send_email(table_html):
     recipients = [
         "amitnamo610@gmail.com",
         "vamsidropmail@gmail.com",
-        "rmohan1969@gmail.com"
+        "rmohan1969@gmail.com",
+        "navtrade.sol@gmail.com"
     ]
 
     message = MIMEMultipart()
