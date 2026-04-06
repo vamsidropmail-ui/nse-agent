@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 import datetime
 import os
 
+
 def run_nse_task():
     url = "https://www.nseindia.com/api/market-data-pre-open?key=FO"
 
@@ -15,9 +16,11 @@ def run_nse_task():
         "Referer": "https://www.nseindia.com/"
     }
 
+    # Create session and get cookies
     session = requests.Session()
     session.get("https://www.nseindia.com", headers=headers)
 
+    # Fetch API data
     response = session.get(url, headers=headers, timeout=10)
 
     if response.status_code != 200:
@@ -28,6 +31,7 @@ def run_nse_task():
 
     data = []
 
+    # Extract required data
     for item in data_json["data"]:
         try:
             symbol = item["metadata"]["symbol"]
@@ -41,12 +45,13 @@ def run_nse_task():
         except:
             continue
 
+    # Process and send email
     if data:
-    df = pd.DataFrame(data)
-    df = df.sort_values(by="symbol")
-    send_email(df.to_html(index=False))
-else:
-    print("No data found")
+        df = pd.DataFrame(data)
+        df = df.sort_values(by="symbol").reset_index(drop=True)
+        send_email(df.to_html(index=False))
+    else:
+        print("No data found")
 
 
 def send_email(table_html):
@@ -61,7 +66,7 @@ def send_email(table_html):
 
     message = MIMEMultipart()
     message["Subject"] = f"NSE F&O Whole Price Stocks - {datetime.date.today()}"
-    message["From"] = f"NSE Alerts <{sender_email}>"
+    message["From"] = f"NSE Alerts (Do Not Reply) <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
     message.attach(MIMEText(table_html, "html"))
