@@ -7,6 +7,7 @@ import datetime
 import os
 
 
+# 🔹 Get live OHLC + price
 def get_full_data(symbol, session, headers):
     url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol}"
 
@@ -22,6 +23,28 @@ def get_full_data(symbol, session, headers):
         "last": price["lastPrice"],
         "prev_close": price["previousClose"]
     }
+
+
+# 🔹 Get Previous Day High / Low
+def get_prev_day_levels(symbol, session, headers):
+    today = datetime.date.today()
+    prev_day = today - datetime.timedelta(days=1)
+
+    date_str = prev_day.strftime("%d-%m-%Y")
+
+    url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={symbol}&series=[%22EQ%22]&from={date_str}&to={date_str}"
+
+    response = session.get(url, headers=headers, timeout=10)
+    data = response.json()
+
+    if "data" in data and len(data["data"]) > 0:
+        d = data["data"][0]
+        return {
+            "prev_high": d["CH_TRADE_HIGH_PRICE"],
+            "prev_low": d["CH_TRADE_LOW_PRICE"]
+        }
+
+    return {"prev_high": None, "prev_low": None}
 
 
 def run_ohlc_task():
@@ -52,9 +75,11 @@ def run_ohlc_task():
             symbol = item["metadata"]["symbol"]
             final_val = item["detail"]["preOpenMarket"]["finalPrice"]
 
+            # Keep your filter
             if float(final_val).is_integer():
 
                 d = get_full_data(symbol, session, headers)
+                prev = get_prev_day_levels(symbol, session, headers)
 
                 open_p = d["open"]
                 high_p = d["high"]
@@ -62,43 +87,52 @@ def run_ohlc_task():
                 last_p = d["last"]
                 prev_close = d["prev_close"]
 
+                prev_high = prev["prev_high"]
+                prev_low = prev["prev_low"]
+
                 # 🔴 OPEN = HIGH
                 if open_p == high_p:
 
-                    category = ""
+                    category = []
+
+                    if prev_low and low_p < prev_low:
+                        category.append("PDL Broken")
 
                     if last_p < prev_close:
-                        category = "Below Prev Close"
+                        category.append("Below Prev Close")
 
                     open_high_list.append({
                         "symbol": symbol,
                         "open": open_p,
                         "high": high_p,
                         "low": low_p,
-                        "category": category
+                        "category": ", ".join(category)
                     })
 
                 # 🟢 OPEN = LOW
                 elif open_p == low_p:
 
-                    category = ""
+                    category = []
+
+                    if prev_high and high_p > prev_high:
+                        category.append("PDH Broken")
 
                     if last_p > prev_close:
-                        category = "Above Prev Close"
+                        category.append("Above Prev Close")
 
                     open_low_list.append({
                         "symbol": symbol,
                         "open": open_p,
                         "high": high_p,
                         "low": low_p,
-                        "category": category
+                        "category": ", ".join(category)
                     })
 
         except:
             continue
 
-    # Email formatting
-    html = "<h2>Open = High Stocks</h2>"
+    # 📧 Email formatting
+    html = "<h2>🔴 Open = High Stocks</h2>"
 
     if open_high_list:
         df_high = pd.DataFrame(open_high_list).sort_values(by="symbol")
@@ -106,7 +140,7 @@ def run_ohlc_task():
     else:
         html += "<p>No stocks found</p>"
 
-    html += "<br><h2>Open = Low Stocks</h2>"
+    html += "<br><h2>🟢 Open = Low Stocks</h2>"
 
     if open_low_list:
         df_low = pd.DataFrame(open_low_list).sort_values(by="symbol")
@@ -126,7 +160,7 @@ def send_email(table_html):
     ]
 
     message = MIMEMultipart()
-    message["Subject"] = f"NSE Open=High / Open=Low (9:21) - {datetime.date.today()}"
+    message["Subject"] = f"NSE Open=High / Open=Low (PDH/PDL) - {datetime.date.today()}"
     message["From"] = f"NSE Alerts (Do Not Reply) <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
