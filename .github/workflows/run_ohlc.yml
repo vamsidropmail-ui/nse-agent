@@ -2,7 +2,7 @@ name: NSE OHLC Automation
 
 on:
   schedule:
-    - cron: '46 3 * * 1-5'   # 9:16 AM IST
+    - cron: '51 3 * * 1-5' # 9:21 AM IST
   workflow_dispatch:
 
 jobs:
