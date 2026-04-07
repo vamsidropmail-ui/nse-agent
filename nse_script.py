@@ -45,15 +45,16 @@ def run_nse_task():
         except:
             continue
 
-    # Process and send email
+    # Process and send email (FIXED INDENTATION)
     if data:
-    df = pd.DataFrame(data)
-    df = df.sort_values(by="symbol").reset_index(drop=True)
-    html = df.to_html(index=False)
-else:
-    html = "<h3>No stocks found with whole number prices today</h3>"
+        df = pd.DataFrame(data)
+        df = df.sort_values(by="symbol").reset_index(drop=True)
+        html = df.to_html(index=False)
+    else:
+        html = "<h3>No stocks found with whole number prices today</h3>"
 
-send_email(html)
+    # Always send email
+    send_email(html)
 
 
 def send_email(table_html):
