@@ -47,11 +47,13 @@ def run_nse_task():
 
     # Process and send email
     if data:
-        df = pd.DataFrame(data)
-        df = df.sort_values(by="symbol").reset_index(drop=True)
-        send_email(df.to_html(index=False))
-    else:
-        print("No data found")
+    df = pd.DataFrame(data)
+    df = df.sort_values(by="symbol").reset_index(drop=True)
+    html = df.to_html(index=False)
+else:
+    html = "<h3>No stocks found with whole number prices today</h3>"
+
+send_email(html)
 
 
 def send_email(table_html):
