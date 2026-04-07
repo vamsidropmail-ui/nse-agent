@@ -7,7 +7,7 @@ import datetime
 import os
 
 
-def get_ohlc(symbol, session, headers):
+def get_full_data(symbol, session, headers):
     url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol}"
 
     response = session.get(url, headers=headers, timeout=10)
@@ -18,7 +18,9 @@ def get_ohlc(symbol, session, headers):
     return {
         "open": price["open"],
         "high": price["intraDayHighLow"]["max"],
-        "low": price["intraDayHighLow"]["min"]
+        "low": price["intraDayHighLow"]["min"],
+        "last": price["lastPrice"],
+        "prev_close": price["previousClose"]
     }
 
 
@@ -31,11 +33,9 @@ def run_ohlc_task():
         "Referer": "https://www.nseindia.com/"
     }
 
-    # Create session
     session = requests.Session()
     session.get("https://www.nseindia.com", headers=headers)
 
-    # Get F&O list
     response = session.get(url, headers=headers, timeout=10)
 
     if response.status_code != 200:
@@ -47,35 +47,57 @@ def run_ohlc_task():
     open_high_list = []
     open_low_list = []
 
-    # Loop through stocks
     for item in data_json["data"]:
         try:
             symbol = item["metadata"]["symbol"]
             final_val = item["detail"]["preOpenMarket"]["finalPrice"]
 
-            # Keep your original filter (whole number)
             if float(final_val).is_integer():
 
-                ohlc = get_ohlc(symbol, session, headers)
+                d = get_full_data(symbol, session, headers)
 
-                if ohlc["open"] == ohlc["high"]:
+                open_p = d["open"]
+                high_p = d["high"]
+                low_p = d["low"]
+                last_p = d["last"]
+                prev_close = d["prev_close"]
+
+                # 🔴 OPEN = HIGH
+                if open_p == high_p:
+
+                    category = ""
+
+                    if last_p < prev_close:
+                        category = "Below Prev Close"
+
                     open_high_list.append({
                         "symbol": symbol,
-                        "open": ohlc["open"],
-                        "high": ohlc["high"]
+                        "open": open_p,
+                        "high": high_p,
+                        "low": low_p,
+                        "category": category
                     })
 
-                elif ohlc["open"] == ohlc["low"]:
+                # 🟢 OPEN = LOW
+                elif open_p == low_p:
+
+                    category = ""
+
+                    if last_p > prev_close:
+                        category = "Above Prev Close"
+
                     open_low_list.append({
                         "symbol": symbol,
-                        "open": ohlc["open"],
-                        "low": ohlc["low"]
+                        "open": open_p,
+                        "high": high_p,
+                        "low": low_p,
+                        "category": category
                     })
 
         except:
             continue
 
-    # Prepare email HTML
+    # Email formatting
     html = "<h2>Open = High Stocks</h2>"
 
     if open_high_list:
@@ -100,12 +122,11 @@ def send_email(table_html):
     password = os.environ["PASSWORD"]
 
     recipients = [
-        "vamsidropmail@gmail.com",
         "vamsidropmail@gmail.com"
     ]
 
     message = MIMEMultipart()
-    message["Subject"] = f"NSE Open=High / Open=Low - {datetime.date.today()}"
+    message["Subject"] = f"NSE Open=High / Open=Low (9:21) - {datetime.date.today()}"
     message["From"] = f"NSE Alerts (Do Not Reply) <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
