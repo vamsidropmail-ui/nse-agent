@@ -156,7 +156,11 @@ def send_email(table_html):
     password = os.environ["PASSWORD"]
 
     recipients = [
-        "vamsidropmail@gmail.com"
+        "amitnamo610@gmail.com",
+        "vamsidropmail@gmail.com",
+        "rmohan1969@gmail.com",
+        "navtrade.sol@gmail.com",
+        "deepacshekar@gmail.com"
     ]
 
     message = MIMEMultipart()
