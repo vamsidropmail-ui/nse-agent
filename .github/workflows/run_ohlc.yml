@@ -1,0 +1,29 @@
+name: NSE OHLC Automation
+
+on:
+  schedule:
+    - cron: '46 3 * * 1-5'   # 9:16 AM IST
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install pandas requests
+
+    - name: Run script
+      env:
+        EMAIL: ${{ secrets.EMAIL }}
+        PASSWORD: ${{ secrets.PASSWORD }}
+      run: python nse_ohlc_script.py
