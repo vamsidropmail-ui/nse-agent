@@ -5,6 +5,24 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import datetime
 import os
+import pytz
+
+# ================= TIME CONTROL =================
+ist = pytz.timezone('Asia/Kolkata')
+now = datetime.datetime.now(ist)
+
+# Allow only between 9:08–9:12 AM IST
+if not (now.hour == 9 and 8 <= now.minute <= 12):
+    print(f"Skipped execution at {now}")
+    exit()
+
+# ================= DUPLICATE CONTROL =================
+today_str = now.strftime("%Y-%m-%d")
+FLAG_FILE = f"sent_{today_str}.flag"
+
+if os.path.exists(FLAG_FILE):
+    print("Mail already sent today")
+    exit()
 
 
 def run_nse_task():
@@ -16,11 +34,9 @@ def run_nse_task():
         "Referer": "https://www.nseindia.com/"
     }
 
-    # Create session and get cookies
     session = requests.Session()
     session.get("https://www.nseindia.com", headers=headers)
 
-    # Fetch API data
     response = session.get(url, headers=headers, timeout=10)
 
     if response.status_code != 200:
@@ -31,7 +47,6 @@ def run_nse_task():
 
     data = []
 
-    # Extract required data
     for item in data_json["data"]:
         try:
             symbol = item["metadata"]["symbol"]
@@ -45,7 +60,6 @@ def run_nse_task():
         except:
             continue
 
-    # Process and send email (FIXED INDENTATION)
     if data:
         df = pd.DataFrame(data)
         df = df.sort_values(by="symbol").reset_index(drop=True)
@@ -53,8 +67,11 @@ def run_nse_task():
     else:
         html = "<h3>No stocks found with whole number prices today</h3>"
 
-    # Always send email
     send_email(html)
+
+    # Create flag AFTER successful email
+    with open(FLAG_FILE, "w") as f:
+        f.write("sent")
 
 
 def send_email(table_html):
