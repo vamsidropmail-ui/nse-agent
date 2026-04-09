@@ -2,12 +2,14 @@ name: NSE Automation
 
 on:
   schedule:
-    - cron: '38 3 * * 1-5'   # 9:08 AM IST (Mon–Fri)
+    - cron: '38 3 * * 1-5'   # 9:08 AM IST
+    - cron: '40 3 * * 1-5'   # Backup run at 9:10 AM IST
   workflow_dispatch:
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - name: Checkout repository
@@ -17,13 +19,18 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        cache: 'pip'
 
     - name: Install dependencies
       run: |
+        pip install --upgrade pip
         pip install pandas requests
 
     - name: Run NSE script
       env:
         EMAIL: ${{ secrets.EMAIL }}
         PASSWORD: ${{ secrets.PASSWORD }}
-      run: python nse_script.py
+      run: |
+        echo "Starting NSE script..."
+        python nse_script.py
+        echo "Script execution completed"
