@@ -127,7 +127,7 @@ def send_email(df_ol, df_oh):
     """
 
     message = MIMEMultipart()
-    message["Subject"] = f"NSE F&O 5-Min Strategy - {datetime.date.today()}"
+    message["Subject"] = f"NSE F&O OHOL - {datetime.date.today()}"
     message["From"] = f"NSE Alerts <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
