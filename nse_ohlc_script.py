@@ -1,180 +1,112 @@
-import requests
 import pandas as pd
+import yfinance as yf
+import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import datetime
 import os
-import pytz
+import time
 
-# ================= TIME CONTROL =================
-ist = pytz.timezone('Asia/Kolkata')
-now = datetime.datetime.now(ist)
 
-# Allow only between 9:15–9:25 AM IST
-if not (now.hour == 9 and 15 <= now.minute <= 25):
-    print(f"Skipped execution at {now}")
-    exit()
+# ================= GET F&O SYMBOLS =================
+def get_symbols():
+    url = "https://www.nseindia.com/api/market-data-pre-open?key=FO"
 
-# ================= DUPLICATE CONTROL =================
-today_str = now.strftime("%Y-%m-%d")
-FLAG_FILE = f"ohlc_sent_{today_str}.flag"
-
-if os.path.exists(FLAG_FILE):
-    print("Mail already sent today")
-    exit()
-
-# ================= NSE SESSION =================
-headers = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept": "application/json",
-    "Referer": "https://www.nseindia.com/"
-}
-
-session = requests.Session()
-session.get("https://www.nseindia.com", headers=headers)
-
-# ================= FUNCTIONS =================
-
-def get_full_data(symbol):
-    url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol}"
-    response = session.get(url, headers=headers, timeout=10)
-    data = response.json()
-
-    price = data["priceInfo"]
-
-    return {
-        "open": price["open"],
-        "high": price["intraDayHighLow"]["max"],
-        "low": price["intraDayHighLow"]["min"],
-        "last": price["lastPrice"],
-        "prev_close": price["previousClose"]
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://www.nseindia.com/"
     }
 
+    session = requests.Session()
+    session.get("https://www.nseindia.com", headers=headers)
 
-def get_prev_day_levels(symbol):
-    today = datetime.date.today()
-    prev_day = today - datetime.timedelta(days=1)
-    date_str = prev_day.strftime("%d-%m-%Y")
-
-    url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={symbol}&series=[%22EQ%22]&from={date_str}&to={date_str}"
     response = session.get(url, headers=headers, timeout=10)
-    data = response.json()
-
-    if "data" in data and len(data["data"]) > 0:
-        d = data["data"][0]
-        return {
-            "prev_high": d["CH_TRADE_HIGH_PRICE"],
-            "prev_low": d["CH_TRADE_LOW_PRICE"]
-        }
-
-    return {"prev_high": None, "prev_low": None}
-
-
-# ================= MAIN LOGIC =================
-
-def run_ohlc_task():
-    url = "https://www.nseindia.com/api/market-data-pre-open?key=FO"
-    response = session.get(url, headers=headers, timeout=10)
-
-    if response.status_code != 200:
-        print("API failed:", response.status_code)
-        return
-
     data_json = response.json()
 
-    open_high_list = []
-    open_low_list = []
-
-    tolerance = 0.1  # IMPORTANT FIX
+    symbols = []
 
     for item in data_json["data"]:
         try:
             symbol = item["metadata"]["symbol"]
             final_val = item["detail"]["preOpenMarket"]["finalPrice"]
 
+            # optional strong filter
             if float(final_val).is_integer():
+                symbols.append(symbol + ".NS")
+        except:
+            continue
 
-                d = get_full_data(symbol)
-                prev = get_prev_day_levels(symbol)
+    return symbols
 
-                open_p = d["open"]
-                high_p = d["high"]
-                low_p = d["low"]
-                last_p = d["last"]
-                prev_close = d["prev_close"]
 
-                prev_high = prev["prev_high"]
-                prev_low = prev["prev_low"]
+# ================= MAIN STRATEGY =================
+def run_strategy():
+    symbols = get_symbols()
 
-                # 🔴 OPEN ≈ HIGH
-                if abs(open_p - high_p) < tolerance:
+    ol_list = []
+    oh_list = []
 
-                    category = []
+    tolerance = 0.05
+    buffer = 0.001
 
-                    if prev_low and low_p < prev_low:
-                        category.append("PDL Broken")
+    for symbol in symbols[:30]:   # limit for speed
+        try:
+            # ===== PREVIOUS DAY DATA =====
+            daily = yf.download(symbol, period="3d", interval="1d", progress=False)
 
-                    if last_p < prev_close:
-                        category.append("Below Prev Close")
+            if len(daily) < 2:
+                continue
 
-                    open_high_list.append({
-                        "symbol": symbol,
-                        "open": open_p,
-                        "high": high_p,
-                        "low": low_p,
-                        "category": ", ".join(category)
-                    })
+            prev_high = daily['High'].iloc[-2]
+            prev_low = daily['Low'].iloc[-2]
 
-                # 🟢 OPEN ≈ LOW
-                elif abs(open_p - low_p) < tolerance:
+            # ===== FIRST 5-MIN CANDLE =====
+            intraday = yf.download(symbol, period="1d", interval="5m", progress=False)
 
-                    category = []
+            if intraday.empty:
+                continue
 
-                    if prev_high and high_p > prev_high:
-                        category.append("PDH Broken")
+            first = intraday.iloc[0]
 
-                    if last_p > prev_close:
-                        category.append("Above Prev Close")
+            o = first['Open']
+            h = first['High']
+            l = first['Low']
+            c = first['Close']
 
-                    open_low_list.append({
-                        "symbol": symbol,
-                        "open": open_p,
-                        "high": high_p,
-                        "low": low_p,
-                        "category": ", ".join(category)
-                    })
+            # ===== STRATEGY =====
+
+            # 🟢 OPEN ≈ LOW + BREAKOUT
+            if abs(o - l) < tolerance and c > prev_high * (1 + buffer):
+                ol_list.append({
+                    "Symbol": symbol,
+                    "Open": round(o, 2),
+                    "Low": round(l, 2),
+                    "Close": round(c, 2),
+                    "PrevHigh": round(prev_high, 2)
+                })
+
+            # 🔴 OPEN ≈ HIGH + BREAKDOWN
+            if abs(o - h) < tolerance and c < prev_low * (1 - buffer):
+                oh_list.append({
+                    "Symbol": symbol,
+                    "Open": round(o, 2),
+                    "High": round(h, 2),
+                    "Close": round(c, 2),
+                    "PrevLow": round(prev_low, 2)
+                })
+
+            time.sleep(0.4)  # avoid rate limits
 
         except Exception as e:
             print(f"Error {symbol}: {e}")
             continue
 
-    # ================= EMAIL =================
-
-    html = "<h2>🔴 Open ≈ High Stocks</h2>"
-
-    if open_high_list:
-        df_high = pd.DataFrame(open_high_list).sort_values(by="symbol")
-        html += df_high.to_html(index=False)
-    else:
-        html += "<p>No stocks found</p>"
-
-    html += "<br><h2>🟢 Open ≈ Low Stocks</h2>"
-
-    if open_low_list:
-        df_low = pd.DataFrame(open_low_list).sort_values(by="symbol")
-        html += df_low.to_html(index=False)
-    else:
-        html += "<p>No stocks found</p>"
-
-    send_email(html)
-
-    # Mark as sent
-    with open(FLAG_FILE, "w") as f:
-        f.write("sent")
+    send_email(pd.DataFrame(ol_list), pd.DataFrame(oh_list))
 
 
-def send_email(table_html):
+# ================= EMAIL =================
+def send_email(df_ol, df_oh):
     sender_email = os.environ["EMAIL"]
     password = os.environ["PASSWORD"]
 
@@ -186,17 +118,26 @@ def send_email(table_html):
         "deepacshekar@gmail.com"
     ]
 
+    html = f"""
+    <h2>🟢 Open ≈ Low + Breakout</h2>
+    {df_ol.to_html(index=False) if not df_ol.empty else '<p>No stocks found</p>'}
+
+    <br><h2>🔴 Open ≈ High + Breakdown</h2>
+    {df_oh.to_html(index=False) if not df_oh.empty else '<p>No stocks found</p>'}
+    """
+
     message = MIMEMultipart()
-    message["Subject"] = f"NSE OHOL Strategy - {datetime.date.today()}"
+    message["Subject"] = f"NSE F&O 5-Min Strategy - {datetime.date.today()}"
     message["From"] = f"NSE Alerts <{sender_email}>"
     message["To"] = ", ".join(recipients)
 
-    message.attach(MIMEText(table_html, "html"))
+    message.attach(MIMEText(html, "html"))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(sender_email, password)
         server.sendmail(sender_email, recipients, message.as_string())
 
 
+# ================= RUN =================
 if __name__ == "__main__":
-    run_ohlc_task()
+    run_strategy()
