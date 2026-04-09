@@ -2,8 +2,8 @@ name: NSE OHLC Strategy
 
 on:
   schedule:
-    - cron: '50 3 * * 1-5'   # 9:20 AM IST
-    - cron: '52 3 * * 1-5'   # Backup
+    - cron: '50 3 * * 1-5'
+    - cron: '52 3 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -19,11 +19,9 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        cache: 'pip'
 
     - name: Install dependencies
       run: |
-        pip install --upgrade pip
         pip install pandas yfinance requests
 
     - name: Run Strategy
